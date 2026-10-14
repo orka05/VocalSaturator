@@ -1,0 +1,59 @@
+
+cmake_minimum_required(VERSION 3.22)
+
+project(VocalSaturator
+    VERSION 0.1.0
+    LANGUAGES CXX
+)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+# JUCE framework
+add_subdirectory(external/JUCE)
+
+# VST3 plugin
+juce_add_plugin(VocalSaturator
+    COMPANY_NAME "VocalLab"
+    BUNDLE_ID "com.vocallab.vocalsaturator"
+
+    PLUGIN_MANUFACTURER_CODE VLab
+    PLUGIN_CODE VSat
+
+    PRODUCT_NAME "Vocal Saturator"
+
+    FORMATS VST3
+    VST3_CATEGORIES Fx Distortion
+
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT FALSE
+    NEEDS_MIDI_OUTPUT FALSE
+
+    COPY_PLUGIN_AFTER_BUILD FALSE
+)
+
+target_sources(VocalSaturator
+    PRIVATE
+        Source/PluginProcessor.cpp
+        Source/PluginProcessor.h
+        Source/PluginEditor.cpp
+        Source/PluginEditor.h
+)
+
+target_compile_definitions(VocalSaturator
+    PUBLIC
+        JUCE_WEB_BROWSER=0
+        JUCE_USE_CURL=0
+)
+
+target_link_libraries(VocalSaturator
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags
+
+    PUBLIC
+        juce::juce_recommended_config_flags
+)

@@ -1,0 +1,39 @@
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# CMake build directories
+build/
+cmake-build-*/
+out/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+CMakeUserPresets.json
+
+# Compiled output
+Debug/
+Release/
+x64/
+x86/
+bin/
+obj/
+*.vst3
+*.dll
+*.pdb
+*.ilk
+*.obj
+*.exe
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
