@@ -6,6 +6,24 @@ VocalSaturatorAudioProcessorEditor(
     : juce::AudioProcessorEditor(&processor),
     audioProcessor(processor)
 {
+    driveSlider.setSliderStyle(
+        juce::Slider::RotaryHorizontalVerticalDrag);
+
+    driveSlider.setTextBoxStyle(
+        juce::Slider::TextBoxBelow, false, 90, 24);
+
+    driveSlider.setTextValueSuffix(" dB");
+    addAndMakeVisible(driveSlider);
+
+    driveLabel.setText("DRIVE", juce::dontSendNotification);
+    driveLabel.setJustificationType(juce::Justification::centred);
+    driveLabel.setColour(
+        juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible(driveLabel);
+
+    driveAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.parameters, "drive", driveSlider);
+
     setSize(520, 320);
 }
 
@@ -15,27 +33,18 @@ void VocalSaturatorAudioProcessorEditor::paint(
     graphics.fillAll(juce::Colour::fromRGB(24, 26, 31));
 
     graphics.setColour(juce::Colours::white);
-    graphics.setFont(juce::Font(26.0f));
+    graphics.setFont(juce::FontOptions(26.0f));
 
     graphics.drawFittedText(
         "VOCAL SATURATOR",
-        getLocalBounds().removeFromTop(110),
-        juce::Justification::centred,
-        1
-    );
-
-    graphics.setColour(juce::Colour::fromRGB(160, 165, 175));
-    graphics.setFont(15.0f);
-
-    graphics.drawFittedText(
-        "Audio engine initialized",
-        getLocalBounds().reduced(20),
-        juce::Justification::centred,
-        1
-    );
+        0, 25, getWidth(), 45,
+        juce::Justification::centred, 1);
 }
 
 void VocalSaturatorAudioProcessorEditor::resized()
 {
-    // GUI controls will be added here later.
+    const int centerX = getWidth() / 2;
+
+    driveSlider.setBounds(centerX - 65, 105, 130, 145);
+    driveLabel.setBounds(centerX - 65, 250, 130, 30);
 }
