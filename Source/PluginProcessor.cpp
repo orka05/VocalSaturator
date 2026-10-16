@@ -11,6 +11,9 @@ VocalSaturatorAudioProcessor::VocalSaturatorAudioProcessor()
     parameters(*this, nullptr, "PARAMETERS", createParameterLayout())
 {
     driveParameter = parameters.getRawParameterValue("drive");
+    mixParameter = parameters.getRawParameterValue("mix");
+    outputParameter = parameters.getRawParameterValue("output");
+
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
@@ -25,6 +28,23 @@ VocalSaturatorAudioProcessor::createParameterLayout()
         0.0f,
         juce::AudioParameterFloatAttributes().withLabel("dB")
     ));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ "mix", 1 },
+        "Mix",
+        juce::NormalisableRange<float>(0.0f, 100.0f, 0.1f),
+        100.0f,
+        juce::AudioParameterFloatAttributes().withLabel("%")
+    ));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ "output", 1 },
+        "Output",
+        juce::NormalisableRange<float>(-24.0f, 12.0f, 0.1f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("dB")
+    ));
+
 
     return layout;
 }
@@ -58,8 +78,19 @@ void VocalSaturatorAudioProcessor::processBlock(
     juce::ignoreUnused(midiMessages);
 
     const float driveDb = driveParameter->load();
-    const float gain = juce::Decibels::decibelsToGain(driveDb);
-    const float normalizer = 1.0f / std::tanh(gain);
+    const float mixPercent = mixParameter->load();
+    const float outputDb = outputParameter->load();
+
+    const float driveGain =
+        juce::Decibels::decibelsToGain(driveDb);
+
+    const float outputGain =
+        juce::Decibels::decibelsToGain(outputDb);
+
+    const float wetMix = mixPercent / 100.0f;
+    const float dryMix = 1.0f - wetMix;
+
+    const float normalizer = 1.0f / std::tanh(driveGain);
 
     const int numChannels = juce::jmin(
         getTotalNumInputChannels(),
@@ -70,16 +101,25 @@ void VocalSaturatorAudioProcessor::processBlock(
     {
         auto* samples = buffer.getWritePointer(channel);
 
-        for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+        for (int sample = 0;
+            sample < buffer.getNumSamples();
+            ++sample)
         {
-            const float input = samples[sample];
-            samples[sample] =
-                std::tanh(input * gain) * normalizer;
+            const float dry = samples[sample];
+
+            const float wet =
+                std::tanh(dry * driveGain) * normalizer;
+
+            const float mixed =
+                dry * dryMix + wet * wetMix;
+
+            samples[sample] = mixed * outputGain;
         }
     }
 
     for (int channel = numChannels;
-        channel < buffer.getNumChannels(); ++channel)
+        channel < buffer.getNumChannels();
+        ++channel)
     {
         buffer.clear(channel, 0, buffer.getNumSamples());
     }
