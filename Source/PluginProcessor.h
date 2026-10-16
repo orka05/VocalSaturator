@@ -41,6 +41,8 @@ private:
         createParameterLayout();
 
     std::atomic<float>* driveParameter = nullptr;
+    std::atomic<float>* mixParameter = nullptr;
+    std::atomic<float>* outputParameter = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
         VocalSaturatorAudioProcessor)
