@@ -52,7 +52,22 @@ VocalSaturatorAudioProcessor::createParameterLayout()
 void VocalSaturatorAudioProcessor::prepareToPlay(
     double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused(sampleRate, samplesPerBlock);
+    juce::ignoreUnused(samplesPerBlock);
+
+    constexpr double smoothingTimeSeconds = 0.02;
+
+    smoothedDrive.reset(sampleRate, smoothingTimeSeconds);
+    smoothedMix.reset(sampleRate, smoothingTimeSeconds);
+    smoothedOutput.reset(sampleRate, smoothingTimeSeconds);
+
+    smoothedDrive.setCurrentAndTargetValue(
+        driveParameter->load());
+
+    smoothedMix.setCurrentAndTargetValue(
+        mixParameter->load() / 100.0f);
+
+    smoothedOutput.setCurrentAndTargetValue(
+        outputParameter->load());
 }
 
 void VocalSaturatorAudioProcessor::releaseResources()
@@ -77,51 +92,58 @@ void VocalSaturatorAudioProcessor::processBlock(
     juce::ScopedNoDenormals noDenormals;
     juce::ignoreUnused(midiMessages);
 
-    const float driveDb = driveParameter->load();
-    const float mixPercent = mixParameter->load();
-    const float outputDb = outputParameter->load();
-
-    const float driveGain =
-        juce::Decibels::decibelsToGain(driveDb);
-
-    const float outputGain =
-        juce::Decibels::decibelsToGain(outputDb);
-
-    const float wetMix = mixPercent / 100.0f;
-    const float dryMix = 1.0f - wetMix;
-
-    const float normalizer = 1.0f / std::tanh(driveGain);
+    smoothedDrive.setTargetValue(driveParameter->load());
+    smoothedMix.setTargetValue(mixParameter->load() / 100.0f);
+    smoothedOutput.setTargetValue(outputParameter->load());
 
     const int numChannels = juce::jmin(
         getTotalNumInputChannels(),
         buffer.getNumChannels()
     );
 
-    for (int channel = 0; channel < numChannels; ++channel)
-    {
-        auto* samples = buffer.getWritePointer(channel);
+    const int numSamples = buffer.getNumSamples();
 
-        for (int sample = 0;
-            sample < buffer.getNumSamples();
-            ++sample)
+    // Process sample-first so smoothing advances once per sample,
+    // not once per channel.
+    for (int sample = 0; sample < numSamples; ++sample)
+    {
+        const float driveDb = smoothedDrive.getNextValue();
+        const float mix = smoothedMix.getNextValue();
+        const float outputDb = smoothedOutput.getNextValue();
+
+        const float driveGain =
+            juce::Decibels::decibelsToGain(driveDb);
+
+        const float outputGain =
+            juce::Decibels::decibelsToGain(outputDb);
+
+        const float normalizer =
+            1.0f / std::tanh(driveGain);
+
+        const float dryMix = 1.0f - mix;
+
+        for (int channel = 0; channel < numChannels; ++channel)
         {
+            auto* samples = buffer.getWritePointer(channel);
+
             const float dry = samples[sample];
 
             const float wet =
                 std::tanh(dry * driveGain) * normalizer;
 
             const float mixed =
-                dry * dryMix + wet * wetMix;
+                dry * dryMix + wet * mix;
 
             samples[sample] = mixed * outputGain;
         }
     }
 
+    // Clear any output channels without a matching input.
     for (int channel = numChannels;
         channel < buffer.getNumChannels();
         ++channel)
     {
-        buffer.clear(channel, 0, buffer.getNumSamples());
+        buffer.clear(channel, 0, numSamples);
     }
 }
 

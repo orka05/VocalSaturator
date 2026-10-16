@@ -44,6 +44,16 @@ private:
     std::atomic<float>* mixParameter = nullptr;
     std::atomic<float>* outputParameter = nullptr;
 
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
+        smoothedDrive;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
+        smoothedMix;
+
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
+        smoothedOutput;
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
         VocalSaturatorAudioProcessor)
 };
