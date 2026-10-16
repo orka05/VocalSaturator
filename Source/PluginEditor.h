@@ -8,8 +8,7 @@ class VocalSaturatorAudioProcessorEditor
 {
 public:
     explicit VocalSaturatorAudioProcessorEditor(
-        VocalSaturatorAudioProcessor& processor
-    );
+        VocalSaturatorAudioProcessor& processor);
 
     ~VocalSaturatorAudioProcessorEditor() override = default;
 
@@ -19,7 +18,14 @@ public:
 private:
     VocalSaturatorAudioProcessor& audioProcessor;
 
+    juce::Slider driveSlider;
+    juce::Label driveLabel;
+
+    using SliderAttachment =
+        juce::AudioProcessorValueTreeState::SliderAttachment;
+
+    std::unique_ptr<SliderAttachment> driveAttachment;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
-        VocalSaturatorAudioProcessorEditor
-    )
+        VocalSaturatorAudioProcessorEditor)
 };
