@@ -24,6 +24,8 @@ private:
     juce::Label mixLabel;
     juce::Slider outputSlider;
     juce::Label outputLabel;
+    juce::Slider toneSlider;
+    juce::Label toneLabel;
 
     using SliderAttachment =
         juce::AudioProcessorValueTreeState::SliderAttachment;
@@ -31,8 +33,7 @@ private:
     std::unique_ptr<SliderAttachment> driveAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<SliderAttachment> outputAttachment;
+    std::unique_ptr<SliderAttachment> toneAttachment;
 
-
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
-        VocalSaturatorAudioProcessorEditor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(VocalSaturatorAudioProcessorEditor)
 };

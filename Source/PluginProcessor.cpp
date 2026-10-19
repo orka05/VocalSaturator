@@ -13,6 +13,7 @@ VocalSaturatorAudioProcessor::VocalSaturatorAudioProcessor()
     driveParameter = parameters.getRawParameterValue("drive");
     mixParameter = parameters.getRawParameterValue("mix");
     outputParameter = parameters.getRawParameterValue("output");
+    toneParameter = parameters.getRawParameterValue("tone");
 
 }
 
@@ -45,6 +46,13 @@ VocalSaturatorAudioProcessor::createParameterLayout()
         juce::AudioParameterFloatAttributes().withLabel("dB")
     ));
 
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{ "tone", 1 },
+        "Tone",
+        juce::NormalisableRange<float>(-6.0f, 6.0f, 0.1f),
+        0.0f,
+        juce::AudioParameterFloatAttributes().withLabel("dB")
+    ));
 
     return layout;
 }
@@ -100,6 +108,19 @@ void VocalSaturatorAudioProcessor::prepareToPlay(
 
     dryDelayBuffer.clear();
     dryDelayWritePosition = 0;
+
+    currentSampleRate = sampleRate;
+
+    smoothedTone.reset(sampleRate, 0.02);
+    smoothedTone.setCurrentAndTargetValue(
+        toneParameter->load());
+
+    // Reset filter history.
+    for (auto& filter : lowShelfFilters)
+        filter.reset();
+
+    for (auto& filter : highShelfFilters)
+        filter.reset();
 }
 
 void VocalSaturatorAudioProcessor::releaseResources()
@@ -143,6 +164,39 @@ void VocalSaturatorAudioProcessor::processBlock(
     smoothedDrive.setTargetValue(driveParameter->load());
     smoothedMix.setTargetValue(mixParameter->load() / 100.0f);
     smoothedOutput.setTargetValue(outputParameter->load());
+    smoothedTone.setTargetValue(toneParameter->load());
+
+    // Advance Tone smoothing for this audio block.
+    const float toneDb = smoothedTone.skip(numSamples);
+
+    const float lowGain =
+        std::pow(10.0f, -toneDb / 40.0f);
+
+    const float highGain =
+        std::pow(10.0f, toneDb / 40.0f);
+
+    const auto lowCoefficients =
+        juce::IIRCoefficients::makeLowShelf(
+            currentSampleRate,
+            700.0f,
+            0.707f,
+            lowGain);
+
+    const auto highCoefficients =
+        juce::IIRCoefficients::makeHighShelf(
+            currentSampleRate,
+            3000.0f,
+            0.707f,
+            highGain);
+
+    for (int channel = 0; channel < numChannels; ++channel)
+    {
+        lowShelfFilters[channel].setCoefficients(
+            lowCoefficients);
+
+        highShelfFilters[channel].setCoefficients(
+            highCoefficients);
+    }
 
     // Copy input into the wet processing buffer.
     for (int channel = 0; channel < numChannels; ++channel)
@@ -197,6 +251,26 @@ void VocalSaturatorAudioProcessor::processBlock(
 
     // Downsample back to the host sample rate.
     oversampler->processSamplesDown(inputBlock);
+
+    // Apply Tone only to the wet signal,
+    // after downsampling and before Dry/Wet mixing.
+    for (int channel = 0; channel < numChannels; ++channel)
+    {
+        auto* samples = wetBuffer.getWritePointer(channel);
+
+        for (int sample = 0; sample < numSamples; ++sample)
+        {
+            float wet = samples[sample];
+
+            wet = lowShelfFilters[channel]
+                .processSingleSampleRaw(wet);
+
+            wet = highShelfFilters[channel]
+                .processSingleSampleRaw(wet);
+
+            samples[sample] = wet;
+        }
+    }
 
     // Mix with latency-compensated dry audio.
     for (int sample = 0; sample < numSamples; ++sample)
