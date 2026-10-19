@@ -2,56 +2,61 @@
 
 VocalSaturatorAudioProcessorEditor::
 VocalSaturatorAudioProcessorEditor(
-    VocalSaturatorAudioProcessor& processor)
-    : juce::AudioProcessorEditor(&processor),
-    audioProcessor(processor)
+    VocalSaturatorAudioProcessor& p)
+    : AudioProcessorEditor(&p),
+    audioProcessor(p)
 {
-    driveSlider.setSliderStyle(
-        juce::Slider::RotaryHorizontalVerticalDrag);
+    auto setupSlider = [this](juce::Slider& slider)
+        {
+            slider.setSliderStyle(
+                juce::Slider::RotaryHorizontalVerticalDrag);
 
-    driveSlider.setTextBoxStyle(
-        juce::Slider::TextBoxBelow, false, 90, 24);
+            slider.setTextBoxStyle(
+                juce::Slider::TextBoxBelow,
+                false, 90, 24);
+
+            addAndMakeVisible(slider);
+        };
+
+    auto setupLabel = [this](
+        juce::Label& label,
+        const juce::String& text)
+        {
+            label.setText(text, juce::dontSendNotification);
+
+            label.setJustificationType(
+                juce::Justification::centred);
+
+            label.setColour(
+                juce::Label::textColourId,
+                juce::Colours::white);
+
+            addAndMakeVisible(label);
+        };
+
+    setupSlider(driveSlider);
+    setupSlider(mixSlider);
+    setupSlider(toneSlider);
+    setupSlider(outputSlider);
+
+    setupLabel(driveLabel, "DRIVE");
+    setupLabel(mixLabel, "MIX");
+    setupLabel(toneLabel, "TONE");
+    setupLabel(outputLabel, "OUTPUT");
 
     driveSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(driveSlider);
-
-    driveLabel.setText("DRIVE", juce::dontSendNotification);
-    driveLabel.setJustificationType(juce::Justification::centred);
-    driveLabel.setColour(
-        juce::Label::textColourId, juce::Colours::white);
-    addAndMakeVisible(driveLabel);
+    mixSlider.setTextValueSuffix(" %");
+    toneSlider.setTextValueSuffix(" dB");
+    outputSlider.setTextValueSuffix(" dB");
 
     driveAttachment = std::make_unique<SliderAttachment>(
         audioProcessor.parameters, "drive", driveSlider);
 
-    mixSlider.setSliderStyle(
-        juce::Slider::RotaryHorizontalVerticalDrag);
-    mixSlider.setTextBoxStyle(
-        juce::Slider::TextBoxBelow, false, 90, 24);
-    mixSlider.setTextValueSuffix(" %");
-    addAndMakeVisible(mixSlider);
-
-    mixLabel.setText("MIX", juce::dontSendNotification);
-    mixLabel.setJustificationType(juce::Justification::centred);
-    mixLabel.setColour(
-        juce::Label::textColourId, juce::Colours::white);
-    addAndMakeVisible(mixLabel);
-
     mixAttachment = std::make_unique<SliderAttachment>(
         audioProcessor.parameters, "mix", mixSlider);
 
-    outputSlider.setSliderStyle(
-        juce::Slider::RotaryHorizontalVerticalDrag);
-    outputSlider.setTextBoxStyle(
-        juce::Slider::TextBoxBelow, false, 90, 24);
-    outputSlider.setTextValueSuffix(" dB");
-    addAndMakeVisible(outputSlider);
-
-    outputLabel.setText("OUTPUT", juce::dontSendNotification);
-    outputLabel.setJustificationType(juce::Justification::centred);
-    outputLabel.setColour(
-        juce::Label::textColourId, juce::Colours::white);
-    addAndMakeVisible(outputLabel);
+    toneAttachment = std::make_unique<SliderAttachment>(
+        audioProcessor.parameters, "tone", toneSlider);
 
     outputAttachment = std::make_unique<SliderAttachment>(
         audioProcessor.parameters, "output", outputSlider);
@@ -75,31 +80,43 @@ void VocalSaturatorAudioProcessorEditor::paint(
 
 void VocalSaturatorAudioProcessorEditor::resized()
 {
-    constexpr int knobWidth = 130;
+    constexpr int knobWidth = 110;
     constexpr int knobHeight = 145;
-    constexpr int spacing = 30;
+    constexpr int spacing = 12;
 
-    const int totalWidth = knobWidth * 3 + spacing * 2;
+    const int totalWidth = knobWidth * 4 + spacing * 3;
     const int startX = (getWidth() - totalWidth) / 2;
-    const int knobY = 105;
-    const int labelY = 250;
+
+    constexpr int knobY = 105;
+    constexpr int labelY = 250;
 
     driveSlider.setBounds(
         startX, knobY, knobWidth, knobHeight);
+
     driveLabel.setBounds(
         startX, labelY, knobWidth, 30);
 
     mixSlider.setBounds(
         startX + knobWidth + spacing,
         knobY, knobWidth, knobHeight);
+
     mixLabel.setBounds(
         startX + knobWidth + spacing,
         labelY, knobWidth, 30);
 
-    outputSlider.setBounds(
+    toneSlider.setBounds(
         startX + (knobWidth + spacing) * 2,
         knobY, knobWidth, knobHeight);
-    outputLabel.setBounds(
+
+    toneLabel.setBounds(
         startX + (knobWidth + spacing) * 2,
+        labelY, knobWidth, 30);
+
+    outputSlider.setBounds(
+        startX + (knobWidth + spacing) * 3,
+        knobY, knobWidth, knobHeight);
+
+    outputLabel.setBounds(
+        startX + (knobWidth + spacing) * 3,
         labelY, knobWidth, 30);
 }

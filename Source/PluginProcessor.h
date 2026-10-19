@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
 
 class VocalSaturatorAudioProcessor : public juce::AudioProcessor
 {
@@ -43,6 +44,8 @@ private:
     std::atomic<float>* driveParameter = nullptr;
     std::atomic<float>* mixParameter = nullptr;
     std::atomic<float>* outputParameter = nullptr;
+    std::atomic<float>* toneParameter = nullptr;
+
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
         smoothedDrive;
@@ -50,6 +53,14 @@ private:
         smoothedMix;
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
         smoothedOutput;
+    juce::SmoothedValue<float,
+        juce::ValueSmoothingTypes::Linear> smoothedTone;
+
+    // Separate filter state for left and right channels.
+    std::array<juce::IIRFilter, 2> lowShelfFilters;
+    std::array<juce::IIRFilter, 2> highShelfFilters;
+
+    double currentSampleRate = 44100.0;
 
     std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
 
