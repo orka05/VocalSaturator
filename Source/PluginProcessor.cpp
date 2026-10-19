@@ -225,6 +225,11 @@ void VocalSaturatorAudioProcessor::processBlock(
         const float gain =
             juce::Decibels::decibelsToGain(driveDb);
 
+        // Drive = 0 dB means unity input gain.
+        // Above 0 dB, progressively increase saturation.
+        const float saturationAmount =
+            juce::jlimit(0.0f, 1.0f, driveDb / 24.0f);
+
         const float normalizer =
             1.0f / std::tanh(gain);
 
@@ -242,9 +247,13 @@ void VocalSaturatorAudioProcessor::processBlock(
                     highRateBlock.getChannelPointer(
                         static_cast<size_t>(channel));
 
+                const float input = samples[index];
+
+                const float saturated =
+                    std::tanh(input * gain) * normalizer;
+
                 samples[index] =
-                    std::tanh(samples[index] * gain)
-                    * normalizer;
+                    input + saturationAmount * (saturated - input);
             }
         }
     }
