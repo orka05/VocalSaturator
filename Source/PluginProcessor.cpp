@@ -52,8 +52,6 @@ VocalSaturatorAudioProcessor::createParameterLayout()
 void VocalSaturatorAudioProcessor::prepareToPlay(
     double sampleRate, int samplesPerBlock)
 {
-    juce::ignoreUnused(samplesPerBlock);
-
     constexpr double smoothingTimeSeconds = 0.02;
 
     smoothedDrive.reset(sampleRate, smoothingTimeSeconds);
@@ -68,6 +66,40 @@ void VocalSaturatorAudioProcessor::prepareToPlay(
 
     smoothedOutput.setCurrentAndTargetValue(
         outputParameter->load());
+
+    const auto channels =
+        static_cast<size_t>(getTotalNumInputChannels());
+
+    oversampler = std::make_unique<
+        juce::dsp::Oversampling<float>>(
+            channels,
+            2, // 2 stages: 2^2 = 4x
+            juce::dsp::Oversampling<float>::
+            filterHalfBandFIREquiripple,
+            true,
+            true // Integer latency
+            );
+
+    oversampler->initProcessing(
+        static_cast<size_t>(samplesPerBlock));
+
+    oversampler->reset();
+
+    oversamplingLatency = juce::roundToInt(
+        oversampler->getLatencyInSamples());
+
+    setLatencySamples(oversamplingLatency);
+
+    wetBuffer.setSize(
+        static_cast<int>(channels),
+        samplesPerBlock);
+
+    dryDelayBuffer.setSize(
+        static_cast<int>(channels),
+        juce::jmax(1, oversamplingLatency));
+
+    dryDelayBuffer.clear();
+    dryDelayWritePosition = 0;
 }
 
 void VocalSaturatorAudioProcessor::releaseResources()
@@ -92,53 +124,124 @@ void VocalSaturatorAudioProcessor::processBlock(
     juce::ScopedNoDenormals noDenormals;
     juce::ignoreUnused(midiMessages);
 
+    const int numChannels = getTotalNumInputChannels();
+    const int numSamples = buffer.getNumSamples();
+
+    if (numSamples == 0)
+        return;
+
+    jassert(oversampler != nullptr);
+    jassert(numSamples <= wetBuffer.getNumSamples());
+
+    if (oversampler == nullptr ||
+        numSamples > wetBuffer.getNumSamples())
+    {
+        buffer.clear();
+        return;
+    }
+
     smoothedDrive.setTargetValue(driveParameter->load());
     smoothedMix.setTargetValue(mixParameter->load() / 100.0f);
     smoothedOutput.setTargetValue(outputParameter->load());
 
-    const int numChannels = juce::jmin(
-        getTotalNumInputChannels(),
-        buffer.getNumChannels()
-    );
+    // Copy input into the wet processing buffer.
+    for (int channel = 0; channel < numChannels; ++channel)
+    {
+        wetBuffer.copyFrom(
+            channel, 0, buffer, channel, 0, numSamples);
+    }
 
-    const int numSamples = buffer.getNumSamples();
+    juce::dsp::AudioBlock<float> wetBlock(wetBuffer);
+    auto inputBlock = wetBlock.getSubBlock(
+        0, static_cast<size_t>(numSamples));
 
-    // Process sample-first so smoothing advances once per sample,
-    // not once per channel.
+    // Upsample 4x.
+    auto highRateBlock =
+        oversampler->processSamplesUp(inputBlock);
+
+    const int highRateSamples =
+        static_cast<int>(highRateBlock.getNumSamples());
+
+    // Apply the waveshaper at the higher sample rate.
+    // Drive smoothing advances at the original sample rate.
     for (int sample = 0; sample < numSamples; ++sample)
     {
         const float driveDb = smoothedDrive.getNextValue();
-        const float mix = smoothedMix.getNextValue();
-        const float outputDb = smoothedOutput.getNextValue();
 
-        const float driveGain =
+        const float gain =
             juce::Decibels::decibelsToGain(driveDb);
 
-        const float outputGain =
-            juce::Decibels::decibelsToGain(outputDb);
-
         const float normalizer =
-            1.0f / std::tanh(driveGain);
+            1.0f / std::tanh(gain);
 
-        const float dryMix = 1.0f - mix;
-
-        for (int channel = 0; channel < numChannels; ++channel)
+        for (int phase = 0; phase < 4; ++phase)
         {
-            auto* samples = buffer.getWritePointer(channel);
+            const int index = sample * 4 + phase;
 
-            const float dry = samples[sample];
+            if (index >= highRateSamples)
+                break;
 
-            const float wet =
-                std::tanh(dry * driveGain) * normalizer;
+            for (int channel = 0;
+                channel < numChannels; ++channel)
+            {
+                auto* samples =
+                    highRateBlock.getChannelPointer(
+                        static_cast<size_t>(channel));
 
-            const float mixed =
-                dry * dryMix + wet * mix;
-
-            samples[sample] = mixed * outputGain;
+                samples[index] =
+                    std::tanh(samples[index] * gain)
+                    * normalizer;
+            }
         }
     }
 
-    // Clear any output channels without a matching input.
+    // Downsample back to the host sample rate.
+    oversampler->processSamplesDown(inputBlock);
+
+    // Mix with latency-compensated dry audio.
+    for (int sample = 0; sample < numSamples; ++sample)
+    {
+        const float mix = smoothedMix.getNextValue();
+
+        const float outputGain =
+            juce::Decibels::decibelsToGain(
+                smoothedOutput.getNextValue());
+
+        for (int channel = 0;
+            channel < numChannels; ++channel)
+        {
+            const float input =
+                buffer.getSample(channel, sample);
+
+            float dry = input;
+
+            if (oversamplingLatency > 0)
+            {
+                dry = dryDelayBuffer.getSample(
+                    channel, dryDelayWritePosition);
+
+                dryDelayBuffer.setSample(
+                    channel, dryDelayWritePosition, input);
+            }
+
+            const float wet =
+                wetBuffer.getSample(channel, sample);
+
+            const float mixed =
+                dry * (1.0f - mix) + wet * mix;
+
+            buffer.setSample(
+                channel, sample, mixed * outputGain);
+        }
+
+        if (oversamplingLatency > 0)
+        {
+            dryDelayWritePosition =
+                (dryDelayWritePosition + 1)
+                % oversamplingLatency;
+        }
+    }
+
     for (int channel = numChannels;
         channel < buffer.getNumChannels();
         ++channel)

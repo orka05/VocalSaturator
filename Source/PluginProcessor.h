@@ -46,13 +46,18 @@ private:
 
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
         smoothedDrive;
-
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
         smoothedMix;
-
     juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>
         smoothedOutput;
 
+    std::unique_ptr<juce::dsp::Oversampling<float>> oversampler;
+
+    juce::AudioBuffer<float> wetBuffer;
+    juce::AudioBuffer<float> dryDelayBuffer;
+
+    int dryDelayWritePosition = 0;
+    int oversamplingLatency = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(
         VocalSaturatorAudioProcessor)
