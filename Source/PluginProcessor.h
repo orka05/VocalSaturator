@@ -56,7 +56,6 @@ private:
     juce::SmoothedValue<float,
         juce::ValueSmoothingTypes::Linear> smoothedTone;
 
-    // Separate filter state for left and right channels.
     std::array<juce::IIRFilter, 2> lowShelfFilters;
     std::array<juce::IIRFilter, 2> highShelfFilters;
 
