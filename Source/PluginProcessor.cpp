@@ -81,7 +81,7 @@ void VocalSaturatorAudioProcessor::prepareToPlay(
     oversampler = std::make_unique<
         juce::dsp::Oversampling<float>>(
             channels,
-            2, // 2 stages: 2^2 = 4x
+            2,
             juce::dsp::Oversampling<float>::
             filterHalfBandFIREquiripple,
             true,
