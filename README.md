@@ -58,10 +58,6 @@ Vocal Saturator is an independent audio plugin project developed by orka.
 
 The project focuses on creating dedicated vocal-processing tools with simple interfaces and practical controls.
 
-## License
-
-See the [LICENSE](LICENSE) file for licensing information.
-
 ---
 
 **Developed by orka**
